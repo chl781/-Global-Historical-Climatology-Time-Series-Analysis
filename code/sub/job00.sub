@@ -1,0 +1,17 @@
+universe = vanilla
+log = job1.log
+error = error/$(Process).err
+
+executable = ./useR.sh
+arguments = $(name)
+output = output/$(Process).out
+
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+transfer_input_files = https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/access/$(name).csv, http://proxy.chtc.wisc.edu/SQUID/chtc/R361.tar.gz, packages.tar.gz, try1.R
+
+request_cpus = 3
+request_memory = 3GB
+request_disk = 3GB
+
+queue name from ghc1.txt.00
