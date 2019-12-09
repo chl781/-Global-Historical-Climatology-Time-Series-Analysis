@@ -1,5 +1,5 @@
 ---
-title: "Report"
+title: "Global Historical Precipitation Time Series Analysis"
 author: "Yuhan Meng, Xueqian Zhang, Chenghui Li, Jitian Zhao"
 date: "8/12/2019"
 output:
@@ -68,17 +68,17 @@ plotForecastErrors <- function(forecasterrors)
 
 2. Consider data longer than 7 years.
 
-3. Choose file that every seasons have data.
+3. Choose file that every season has data.
 
 4. Convert snowfall to rainfall by multiplying 1/15.
 
 ## CHTC data grasping and processing
 
-+ **Location Selection**:The stations are located in so many countries and it's complexed to analyze all of them because the dataset is so huge.Therefore,firstly we write a match.sh to choose only stations from CA, CH, UK and US these four large countries. 
++ **Location Selection**:The stations are located in so many countries and it's complexed to analyze all of them because the dataset is so huge.Therefore,firstly we write a match.sh to choose only stations from Canada (CA), China (CN), United Kindom (UK) and United States (US) these four large countries. 
 
-+ **Data spliting and parallel processing**: Then after constructing the R file to fit ARIMA model for the corresponding csv file and put AIC in a dataframe, we split the whole dataset into 10 parts, which is similar to  WBS(work breakdown structure) to break the enormous job into 10 subtasks. Apply the R file on each csv by submitting the tasks and do parallel processing.  
++ **Data spliting and parallel processing**: Then after constructing the R file to fit ARIMA model for the corresponding csv file and put AIC in a dataframe, we split the whole dataset into 10 parts, which is similar to WBS(work breakdown structure) to break the enormous job into 10 subtasks. Apply the R file on each csv by submitting the tasks and do parallel processing.  
 
-+ **Get best 50 models**: Because the smaller the AIC, the better the model will be fitting. After gaining the AIC of each model from each csv file, we merge the output AICs together and sort them from smallest to largest and extract only the first 50. Next, based on these 50 csv files, we could do further analysis.
++ **Get best 50 models**: Because the smaller the AIC, the better the model will be fitting. After gaining the AIC of each model from each csv file, we merge the output AICs together and sort them from smallest to largest and extract only the first 50. Here we encounter the problem that the csv file with the smallest AIC has many NAs in the precipitation of rainfall as well as the missing months of the dates. Therefore,we reprocess the data and use seasonal mean instead of monthly mean. As for the NAs in the precipitation, it's because these places scarcely rain or frequently snow due to the low temperature. The best way is to change the snowfall to rainfall accordint to the formula. However, because of the enormous work and limited time we give up the transformation and just disard those files. Next, based on these 50 csv files, we do further analysis.
 
 
 ## Result
@@ -91,6 +91,7 @@ kable(t(a[1:5,])) %>%
 ```
 
 + **Example**:
+
 Because the AIC can be very good if there is no so much rain fall in one place, we cannot determine the station of the time series of a place only depending on AIC. We use the data having 22th smallest AIC as an example, namely USC00358343. The following is the trend of data. As we can see, every month has rain fall, and this can make sense for reality.
 
 
@@ -139,7 +140,7 @@ qqnorm(fit$residuals)
 qqline(fit$residuals)
 ```
 
-According to the acf and pacf plots, we could identify some values of the autocorrelation exceed the dashed line, indicating that the time series is not a white noise. Hence, we should consider to fit the ARMA model. 
+According to the Autocorrelation Function (ACF) and Partial Autocorrelation (PACF) plots, we could identify some values of the autocorrelation exceed the dashed line, indicating that the time series is not a white noise. Hence, we should consider to fit the ARMA model. 
 
 ```{r echo=F,fig.height=4.5,fig.width=8}
 par(mfrow=c(1,2))
@@ -147,6 +148,16 @@ acf(dta,lag.max=100) #plot a correlogram
 #acf(dta,lag.max=100,plot=FALSE) # get the autocorrelation values
 pacf(dta,lag.max=100) #plot a partial correlogram
 ```
+
+
++ **ARIMA Model Fitting**
+
+```{r,echo=F}
+rainseries.arima=auto.arima(ts(final1$meanseason,frequency = 4))
+rainseries.arima
+```
+
+From the output, we could find the appropriate ARIMA model is ARIMA(0,0,1)(1,1,0)[4], which is a complexed seasonal ARIMA model and therefore next we use the famous seasonal model HoltWinters with cubic exponential smoothing method to do further analysis.
 
 The final HoltWinters model shows great performance on model fitting.The coefficient $\alpha$ is 
 0.3166, which is close to 0, showing strong smoothing effect of our model. The coefficient $\beta$ is 0.0283, which is exceedingly close to 0, and therefore, the series don't have large trend effect. The coefficient $\gamma$ is 0.3562, illustrating the periodical seasonal effect.
@@ -164,7 +175,7 @@ Finally, because the general pattern of the fitted value is similar to the patte
 plot(forecast(rainseriesforecasts,8))
 ```
 
-The blue line represents the predicted precipitation for the next 2 years (8 seasons). The grey area represents the 95\% confidence interval band.
+The blue line represents the predicted precipitation for the next 2 years (8 seasons). The grey area represents the 95\% confidence interval band. Similarly, we could apply the above methods to the best 50 csv files we choose and do model fitting and forecasting.
 
 **Discussion**
 
@@ -172,7 +183,7 @@ Strength:
 
 1. Using Parallel data processing with CHTC enhances the velocity of fitting enormous time series data.
 
-2. Using HoltWinters model, which is a cubic exponential smoothing method, ensures the model accuracy and give brilliant performance for predicting.
+2. Using HoltWinters model, which is a cubic exponential smoothing method, ensures the model accuracy and gives brilliant performance for predicting.
 
 Weakness:
 
