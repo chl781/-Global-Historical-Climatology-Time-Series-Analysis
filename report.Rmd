@@ -1,0 +1,185 @@
+---
+title: "Report"
+author: "Yuhan Meng, Xueqian Zhang, Chenghui Li, Jitian Zhao"
+date: "8/12/2019"
+output:
+  html_document: default
+  pdf_document: default
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(tseries)
+require(astsa)
+require(ggplot2)
+require(forecast)
+require(knitr)
+library(kableExtra)
+
+#############################################################function
+
+plotForecastErrors <- function(forecasterrors)
+{
+  # make a histogram of the forecast errors:
+  mybinsize <- IQR(forecasterrors, na.rm = TRUE)/4
+  mysd   <- sd(forecasterrors, na.rm = TRUE)
+  mymin  <- min(forecasterrors, na.rm = TRUE) - mysd*5
+  mymax  <- max(forecasterrors, na.rm = TRUE) + mysd*3
+  # generate normally distributed data with mean 0 and standard deviation mysd
+  mynorm <- rnorm(10000, mean=0, sd=mysd)
+  mymin2 <- min(mynorm, na.rm = TRUE)
+  mymax2 <- max(mynorm, na.rm = TRUE)
+  if (mymin2 < mymin ) { mymin <- mymin2}
+  if (mymax2 > mymax) { mymax <- mymax2}
+  # make a red histogram of the forecast errors, with the normally distributed data overlaid:
+  mybins <- seq(mymin, mymax, mybinsize)
+  hist(forecasterrors, col="red", freq=FALSE, breaks=mybins)
+  # freq=FALSE ensures the area under the histogram = 1
+  # generate normally distributed data with mean 0 and standard deviation mysd
+  myhist <- hist(mynorm, plot=FALSE, breaks=mybins)
+  # plot the normal curve as a blue line on top of the histogram of forecast errors:
+  points(myhist$mids, myhist$density, type="l", col="blue", lwd=2)
+}
+
+
+#############################################################
+```
+
+
+## Data Description
++ **URL**: https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/
+
++ **Data Context**: The Global Historical Climatology Network–daily (GHCNd) dataset is a set of daily climate summaries from thousands of weather stations around the world. The monthly data have periods of record that vary by station with the earliest observations dating to the 18th century. Some station records are purely historic and are no longer updated whereas many others are still in operation and provide short time delay updates that are useful for climate monitoring.
+
++ **Data Format**: Each file represent climate data collected over years at one station. There are a lot of missing values in our data. Some stations might lack data of rainfall, some only have data in a short period of time.
+
+## Data Prepossessing
+
+**Problem**: 
+
+1. Missing value, the date of rainfall is not continuous and even lose data of whole months.
+
+2. When a day is no raining the record is 0.
+
+3. Snowfall record instead of rainfall. 
+
+**Solution**:
+
+1. Use the mean of season to constrain it.
+
+2. Consider data longer than 7 years.
+
+3. Choose file that every seasons have data.
+
+4. Convert snowfall to rainfall by multiplying 1/15.
+
+## CHTC data grasping and processing
+
++ **Location Selection**:The stations are located in so many countries and it's complexed to analyze all of them because the dataset is so huge.Therefore,firstly we write a match.sh to choose only stations from CA, CH, UK and US these four large countries. 
+
++ **Data spliting and parallel processing**: Then after constructing the R file to fit ARIMA model for the corresponding csv file and put AIC in a dataframe, we split the whole dataset into 10 parts, which is similar to  WBS(work breakdown structure) to break the enormous job into 10 subtasks. Apply the R file on each csv by submitting the tasks and do parallel processing.  
+
++ **Get best 50 models**: Because the smaller the AIC, the better the model will be fitting. After gaining the AIC of each model from each csv file, we merge the output AICs together and sort them from smallest to largest and extract only the first 50. Next, based on these 50 csv files, we could do further analysis.
+
+
+## Result
++ **AIC**:Akaike information criterion (AIC) is an estimator of out-of-sample prediction error and thereby relative quality of statistical models for a given set of data. [1] We order the AICs of all data and then output the best 50. We make the table of the first 5 as an illustration. 
+
+```{r echo=F}
+a=read.csv("best50.csv")
+kable(t(a[1:5,])) %>%
+  kable_styling(fixed_thead = T)
+```
+
++ **Example**:
+Because the AIC can be very good if there is no so much rain fall in one place, we cannot determine the station of the time series of a place only depending on AIC. We use the data having 22th smallest AIC as an example, namely USC00358343. The following is the trend of data. As we can see, every month has rain fall, and this can make sense for reality.
+
+
+```{r,include=FALSE}
+require(quantmod,quiet=T)
+data=read.csv("USC00358343.csv")
+data$DATE=as.character(data$DATE)
+all_year=substr(data$DATE,start=1,stop=5)
+all_month=substr(data$DATE,start=6,stop=7)
+all_month=as.numeric(all_month)
+all_season=as.character((all_month-1)%/%3)
+all_date=paste0(all_year,all_season)
+unique.date=unique(all_date)
+length_season=length(unique.date)
+meanseason=rep(0,length_season)
+for(i in 1:length_season){
+  meanseason[i]=mean(data$PRCP[all_date==unique.date[i]],na.rm=T)
+}
+final1=data.frame(unique.date,meanseason)
+final1$unique.date=as.character(final1$unique.date)
+dta=ts(final1$meanseason,frequency = 4)
+fit=auto.arima(dta)
+seasonal_precipitation=dta
+
+```
+
+
+
+$$ $$
+
+
+
+
+```{r,echo=FALSE,fig.height=3.5,fig.width=8.5}
+chartSeries(seasonal_precipitation,theme="white")
+```
+
+$$ $$
+
+We plot the error's histogram. As we can see, it follows a normal distribution. The qqplot also agrees with this even if there are several extreme points lying outside the straight line.
+
+```{r echo=F,fig.height=4.5,fig.width=8}
+par(mfrow=c(1,2))
+plotForecastErrors(fit$residuals)
+qqnorm(fit$residuals)
+qqline(fit$residuals)
+```
+
+According to the acf and pacf plots, we could identify some values of the autocorrelation exceed the dashed line, indicating that the time series is not a white noise. Hence, we should consider to fit the ARMA model. 
+
+```{r echo=F,fig.height=4.5,fig.width=8}
+par(mfrow=c(1,2))
+acf(dta,lag.max=100) #plot a correlogram
+#acf(dta,lag.max=100,plot=FALSE) # get the autocorrelation values
+pacf(dta,lag.max=100) #plot a partial correlogram
+```
+
+The final HoltWinters model shows great performance on model fitting.The coefficient $\alpha$ is 
+0.3166, which is close to 0, showing strong smoothing effect of our model. The coefficient $\beta$ is 0.0283, which is exceedingly close to 0, and therefore, the series don't have large trend effect. The coefficient $\gamma$ is 0.3562, illustrating the periodical seasonal effect.
+
+```{r Echo=F,fig.height=4.5,fig.width=8}
+rainseriesforecasts <- HoltWinters(ts(final1$meanseason,frequency = 4))
+rainseriesforecasts
+#rainseriesforecasts$fitted
+plot(rainseriesforecasts)
+```
+
+Finally, because the general pattern of the fitted value is similar to the pattern of real data, we can then employ this model for future forecasting.
+
+```{r echo=F,fig.height=4.5,fig.width=8}
+plot(forecast(rainseriesforecasts,8))
+```
+
+The blue line represents the predicted precipitation for the next 2 years (8 seasons). The grey area represents the 95\% confidence interval band.
+
+**Discussion**
+
+Strength:
+
+1. Using Parallel data processing with CHTC enhances the velocity of fitting enormous time series data.
+
+2. Using HoltWinters model, which is a cubic exponential smoothing method, ensures the model accuracy and give brilliant performance for predicting.
+
+Weakness:
+
+1. Because of time limitation, we didn't transform the snowfall percipitation into rainfall percipitation and just ignored those files.
+
+**Reference**\
+[1]: https://en.wikipedia.org/wiki/Akaike_information_criterion
+
+
+
