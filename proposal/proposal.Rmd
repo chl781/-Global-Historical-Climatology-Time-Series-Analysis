@@ -1,0 +1,43 @@
+---
+title: "Proposal"
+author: "Yuhan Meng, Xueqian Zhang, Chenghui Li, Jitian Zhao"
+date: "15/11/2019"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+## Data Description
++ **URL**: https://www.ncei.noaa.gov/data/global-historical-climatology-network-daily/
++ **Data Context**: The Global Historical Climatology Network–daily (GHCNd) dataset is a set of daily climate summaries from thousands of weather stations around the world. The monthly data have periods of record that vary by station with the earliest observations dating to the 18th century. Some station records are purely historic and are no longer updated whereas many others are still in operation and provide short time delay updates that are useful for climate monitoring.
++ **Data Format**: Each file represent climate data collected over years at one station. There are a lot of missing values in our data. Some station might lack data of snowfall, some only have data in a short period of time.
+
+### Data Attributes
+We'll make use of STATION, DATE, PRCP, SNOW, TMAX and TMIN.
+
++ STATION: the station identification code.
++ DATE: date of data collected.
++ LATITUDE: latitude of the station (in decimal degrees).
++ LONGITUDE: longitude of the station (in decimal degrees).
++ ELEVATION: elevation of the station (in meters, missing = -999.9).
++ NAME: name of the station.
++ PRCP: precipitation (tenths of mm).
++ SNOW: snowfall (mm).
++ TMAX: maximum temperature (tenths of degrees C)
++ TMIN: minimum temperature (tenths of degrees C)
+
+## Question
++ **How complete are our data files?**
++ **What is the overall trend of temperature changing among world?**
++ **Are there any stations indicate significant monthly periodicity of precipitation?**
++ **What is the average precipitation distribution among world? **
+
+## Statistical Methods
++ **time series analysis**
++ **ARCH effect analysis**
+
+## Computation Methods
++ Use parallel computation to select data files that meet our requirements. (has data of certain time period, has no missing value on certain attributes...) 
++ Use parallel computation to fit HoltWinters models for our selected data files.
++ Select stations that have significant trends in certain attributes and explore their periodicity.
+
